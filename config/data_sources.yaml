@@ -1,0 +1,33 @@
+datasets:
+  plant_village:
+    name: "PlantVillage Dataset"
+    description: "Leaf disease images for 38 plant categories"
+    urls:
+      - "https://data.mendeley.com/public-files/datasets/tywbtsjrjh/files/d5652a28-c1d8-4b76-97f3-72fb80f94efc/file_downloaded"
+      - "kaggle://abdallahalidev/plantvillage-dataset"
+    file_format: "tar.gz"
+    expected_size: "2.5 GB"
+    classes: 38
+    
+  cy_bench:
+    name: "CY-Bench Crop Yield Dataset"
+    description: "Multi-year crop yield data with weather features"
+    urls:
+      - "https://github.com/ai4agriculture/CY-Bench/archive/refs/heads/main.zip"
+    file_format: "zip"
+    expected_size: "500 MB"
+    crops: ["maize", "soybean", "wheat"]
+    
+  india_agri:
+    name: "Indian Agriculture Dataset"
+    description: "District-wise crop production and weather data"
+    urls:
+      - "https://data.gov.in/files/ogdpv2dmz/catalog/agriculture.zip"
+      - "https://raw.githubusercontent.com/someshkar/india-agriculture-crop-data/master/crop_production.csv"
+    file_format: "csv/zip"
+    expected_size: "100 MB"
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  logs: "logs"
