@@ -1,0 +1,195 @@
+import torch
+from torchvision import transforms
+from PIL import Image
+import torch.nn.functional as F
+import torch.nn as nn
+import timm
+from vit import get_m
+
+import torch.nn as nn
+import torch
+import os                       
+import numpy as np              
+import pandas as pd            
+import torch                    
+import matplotlib.pyplot as plt 
+import torch.nn as nn           
+from torch.utils.data import DataLoader 
+from PIL import Image          
+import torch.nn.functional as F 
+import torchvision.transforms as transforms   
+from torchvision.utils import make_grid       
+from torchvision.datasets import ImageFolder  
+from torchsummary import summary              
+from torchvision.models import resnet50
+from gpu import to_d
+from utils import pair
+from einops import rearrange, repeat
+from einops.layers.torch import Rearrange
+from torch import nn, einsum
+from prenorm import PreNorm
+from feed_forward import FeedForward
+
+
+def accuracy(outputs, labels):
+    _, preds = torch.max(outputs, dim=1)
+    return torch.tensor(torch.sum(preds == labels).item() / len(preds))
+
+
+class ImageClassificationBase(nn.Module):
+    
+    def training_step(self, batch):
+        images, labels = batch  
+        out = self(images)                  
+        loss = F.cross_entropy(out, labels) 
+        return loss
+    
+    def validation_step(self, batch):
+        images, labels = batch
+        out = self(images)                   
+        loss = F.cross_entropy(out, labels)  
+        acc = accuracy(out, labels)          
+        return {"val_loss": loss.detach(), "val_accuracy": acc}
+    
+    def validation_epoch_end(self, outputs):
+        batch_losses = [x["val_loss"] for x in outputs]
+        batch_accuracy = [x["val_accuracy"] for x in outputs]
+        epoch_loss = torch.stack(batch_losses).mean()         
+        epoch_accuracy = torch.stack(batch_accuracy).mean()
+        return {"val_loss": epoch_loss, "val_accuracy": epoch_accuracy} 
+    
+    def epoch_end(self, epoch, result):
+        print("Epoch [{}], last_lr: {:.5f}, train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
+            epoch, result['lrs'][-1], result['train_loss'], result['val_loss'], result['val_accuracy']))
+        
+
+class Attention(nn.Module):
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
+        super().__init__()
+        inner_dim = dim_head * heads
+        project_out = not (heads == 1 and dim_head == dim)
+
+        self.heads = heads
+        self.scale = dim_head ** -0.5
+
+        self.attend = nn.Softmax(dim=-1)
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout),
+        ) if project_out else nn.Identity()
+
+    def forward(self, x):
+        b, n, _, h = *x.shape, self.heads
+        qkv = self.to_qkv(x).chunk(3, dim=-1)  
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)  
+
+        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+
+        attn = self.attend(dots)
+
+        out = einsum('b h i j, b h j d -> b h i d', attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        return self.to_out(out)
+
+
+class Transformer(nn.Module):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
+            ]))
+
+    def forward(self, x):
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        return x
+
+
+class ViT(ImageClassificationBase):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool='cls', channels=3,
+                 dim_head=64, dropout=0., emb_dropout=0.):
+        super().__init__()
+        image_height, image_width = pair(image_size)
+        patch_height, patch_width = pair(patch_size)
+
+        assert image_height % patch_height == 0 and image_width % patch_width == 0
+
+        num_patches = (image_height // patch_height) * (image_width // patch_width)
+        patch_dim = channels * patch_height * patch_width
+        assert pool in {'cls', 'mean'}
+
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
+            nn.Linear(patch_dim, dim)
+        )
+
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))  
+        self.dropout = nn.Dropout(emb_dropout)
+
+        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
+
+        self.pool = pool
+        self.to_latent = nn.Identity()
+
+        self.mlp_head = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, num_classes)
+        )
+
+    def forward(self, img):
+        x = self.to_patch_embedding(img)  
+        b, n, _ = x.shape  
+        cls_tokens = repeat(self.cls_token, '() n d -> b n d',
+                            b=b)  
+        x = torch.cat((cls_tokens, x), dim=1)  
+        x += self.pos_embedding[:, :(n + 1)]  
+        x = self.dropout(x)
+
+        x = self.transformer(x)  
+
+        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0] 
+
+        x = self.to_latent(x)  
+
+        return self.mlp_head(x)  
+    
+
+data = torch.load("../models/plant-disease-model-complete.pth", 
+                  map_location="cpu", 
+                  weights_only=False)
+
+
+transform = transforms.Compose([
+    transforms.Resize((224,224)),
+    transforms.ToTensor()
+])
+
+model = to_d(ViT(
+        image_size = 256,
+        patch_size = 32,
+        num_classes = 38,
+        dim = 1024,
+        depth = 6,
+        heads = 16,
+        mlp_dim = 2048,
+        dropout = 0.1,
+        emb_dropout = 0.1
+    ),'cpu') 
+
+
+
+img = Image.open(r"C:\Users\RMSTVNMFST\mahesh\disease-vit\data\New Plant Diseases Dataset(Augmented)\New Plant Diseases Dataset(Augmented)\train\Cherry_(including_sour)___healthy\0a0bd696-c093-47ef-866b-7f5a40af3edb___JR_HL 3952.JPG").convert("RGB")
+x = transform(img).unsqueeze(0)
+
+with torch.no_grad():
+    output = model(x)
+
+_, preds  = torch.max(output, dim=1)
+print(preds[0].item())
