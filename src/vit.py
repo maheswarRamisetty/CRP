@@ -153,6 +153,9 @@ class ViT(ImageClassificationBase):
 
         return self.mlp_head(x)  
     
+
+class Block:
+    
     
 from gpu import get_d
 device = get_d()
