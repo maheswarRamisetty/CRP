@@ -234,7 +234,7 @@ from gpu import get_d
 model = None
 
 def build():
-    vit = ViT(ImageClassificationBase)
+    # vit = ViT(ImageClassificationBase)
     model = Sequential()
     model.add(Conv2D(96, 11, strides = (4, 4), padding = 'valid', input_shape=(224, 224, 3), activation = 'relu'))
     model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding = 'valid'))
