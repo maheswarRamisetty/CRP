@@ -16,3 +16,5 @@ class VisionTransformer(ImageClassificationBase):
         out = self.fc(out)
         out = self.relu(out)
         return out
+    
+    

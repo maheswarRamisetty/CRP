@@ -1,14 +1,16 @@
-
 import torch.nn as nn
 import torch
 import os                       
 import numpy as np              
 import pandas as pd            
-import torch                    
+import torch   
+import joblib                 
 import matplotlib.pyplot as plt 
 import torch.nn as nn           
 from torch.utils.data import DataLoader 
-from PIL import Image          
+from PIL import Image  
+from collections import defaultdict
+from abc import abstractclassmethod        
 import torch.nn.functional as F 
 import torchvision.transforms as transforms   
 from torchvision.utils import make_grid       
@@ -22,6 +24,14 @@ from einops.layers.torch import Rearrange
 from torch import nn, einsum
 from prenorm import PreNorm
 from feed_forward import FeedForward
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import  MaxPooling2D
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import BatchNormalization
+
 
 
 def accuracy(outputs, labels):
@@ -182,7 +192,7 @@ class Net(ImageClassificationBase):
         self.conv4 = self.obj.ConvBlock(256, 512, pool=True) 
         self.res2 = nn.Sequential(self.obj.ConvBlock(512, 512), self.obj.ConvBlock(512, 512))
         
-        self.classifier = nn.Sequential(nn.MaxPool2d(4),
+        self.model = nn.Sequential(nn.MaxPool2d(4),
                                        nn.Flatten(),
                                        nn.Linear(512, num_diseases))
         
@@ -193,7 +203,7 @@ class Net(ImageClassificationBase):
         out = self.conv3(out)
         out = self.conv4(out)
         out = self.res2(out) + out
-        out = self.classifier(out)
+        out = self.model(out)
         return out 
 
 from gpu import get_d
@@ -211,10 +221,45 @@ model = to_d(ViT(
         emb_dropout = 0.1
     ),device) 
 
-# model = to_d(Net(3, 38), device) 
+model = None
+model = Sequential()
+model.add(Conv2D(96, 11, strides = (4, 4), padding = 'valid', input_shape=(224, 224, 3), activation = 'relu'))
+model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding = 'valid'))
+model.add(BatchNormalization())
+
+model.add(Conv2D(256, 11, strides = (1, 1), padding='valid', activation = 'relu'))
+
+model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding='valid'))
+model.add(BatchNormalization())
+
+model.add(Conv2D(384, 3, strides = (1, 1), padding='valid', activation = 'relu'))
+model.add(BatchNormalization())
+
+model.add(Conv2D(384, 3, strides = (1, 1), padding='valid', activation = 'relu'))
+model.add(BatchNormalization())
+
+model.add(Conv2D(256, 3, strides=(1,1), padding='valid', activation = 'relu'))
+
+model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding = 'valid'))
+model.add(BatchNormalization())
+
+model.add(Flatten())
+
+model.add(Dense(units = 4096, activation = 'relu'))
+model.add(Dropout(0.4))
+model.add(BatchNormalization())
+model.add(Dense(units = 4096, activation = 'relu'))
+model.add(Dropout(0.4))
+model.add(BatchNormalization())
+model.add(Dense(units = 1000, activation = 'relu'))
+model.add(Dropout(0.2))
+model.add(BatchNormalization())
+model.add(Dense(units = 38, activation = 'softmax'))
+
+print(model.summary())
 
 def get_m():
     return model
 
-print(model)
+# print(model)
 

@@ -1,21 +1,16 @@
-import torch
-from torchvision import transforms
-from PIL import Image
-import torch.nn.functional as F
-import torch.nn as nn
-import timm
-from vit import get_m
-
 import torch.nn as nn
 import torch
 import os                       
 import numpy as np              
 import pandas as pd            
-import torch                    
+import torch   
+import joblib                 
 import matplotlib.pyplot as plt 
 import torch.nn as nn           
 from torch.utils.data import DataLoader 
-from PIL import Image          
+from PIL import Image  
+from collections import defaultdict
+from abc import abstractclassmethod        
 import torch.nn.functional as F 
 import torchvision.transforms as transforms   
 from torchvision.utils import make_grid       
@@ -24,11 +19,29 @@ from torchsummary import summary
 from torchvision.models import resnet50
 from gpu import to_d
 from utils import pair
+from utils import class_l
+import torch
+from PIL import Image
+import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import load_model
+from utils import lebel_to_idx
 from torch import nn, einsum
 from prenorm import PreNorm
+from tensorflow.keras.preprocessing import image
 from feed_forward import FeedForward
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import  MaxPooling2D
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import BatchNormalization
+
 
 
 def accuracy(outputs, labels):
@@ -39,7 +52,7 @@ def accuracy(outputs, labels):
 class ImageClassificationBase(nn.Module):
     
     def training_step(self, batch):
-        images, labels = batch  
+        images, labels = batch
         out = self(images)                  
         loss = F.cross_entropy(out, labels) 
         return loss
@@ -47,7 +60,7 @@ class ImageClassificationBase(nn.Module):
     def validation_step(self, batch):
         images, labels = batch
         out = self(images)                   
-        loss = F.cross_entropy(out, labels)  
+        loss = F.cross_entropy(out, labels) 
         acc = accuracy(out, labels)          
         return {"val_loss": loss.detach(), "val_accuracy": acc}
     
@@ -61,7 +74,7 @@ class ImageClassificationBase(nn.Module):
     def epoch_end(self, epoch, result):
         print("Epoch [{}], last_lr: {:.5f}, train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
             epoch, result['lrs'][-1], result['train_loss'], result['val_loss'], result['val_accuracy']))
-        
+
 
 class Attention(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
@@ -161,35 +174,132 @@ class ViT(ImageClassificationBase):
         return self.mlp_head(x)  
     
 
-data = torch.load("../models/plant-disease-model-complete.pth", 
-                  map_location="cpu", 
-                  weights_only=False)
+class Block:
+    def __init__(self):
+        self.patches = []
+    
+    def ConvBlock(self, in_channels, out_channels, pool=False):
+        layers = [
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        ]
+        if pool:
+            layers.append(nn.MaxPool2d(4))
+        return nn.Sequential(*layers)
+
+    
+class Net(ImageClassificationBase):
+    def __init__(self, in_channels, num_diseases):
+        super().__init__()
+        self.obj = Block()
+        
+        self.conv1 = self.obj.ConvBlock(in_channels, 64)
+        self.conv2 = self.obj.ConvBlock(64, 128, pool=True) 
+        self.res1 = nn.Sequential(self.obj.ConvBlock(128, 128), self.obj.ConvBlock(128, 128))
+        
+        self.conv3 = self.obj.ConvBlock(128, 256, pool=True) 
+        self.conv4 = self.obj.ConvBlock(256, 512, pool=True) 
+        self.res2 = nn.Sequential(self.obj.ConvBlock(512, 512), self.obj.ConvBlock(512, 512))
+        
+        self.model = nn.Sequential(nn.MaxPool2d(4),
+                                       nn.Flatten(),
+                                       nn.Linear(512, num_diseases))
+        
+    def forward(self, xb): 
+        out = self.conv1(xb)
+        out = self.conv2(out)
+        out = self.res1(out) + out
+        out = self.conv3(out)
+        out = self.conv4(out)
+        out = self.res2(out) + out
+        out = self.model(out)
+        return out 
+
+from gpu import get_d
+# device = get_d()
+# device
+# model = to_d(ViT(
+#         image_size = 256,
+#         patch_size = 32,
+#         num_classes = 38,
+#         dim = 1024,
+#         depth = 6,
+#         heads = 16,
+#         mlp_dim = 2048,
+#         dropout = 0.1,
+#         emb_dropout = 0.1
+#     ),device) 
+
+model = None
+
+def build():
+    model = Sequential()
+    model.add(Conv2D(96, 11, strides = (4, 4), padding = 'valid', input_shape=(224, 224, 3), activation = 'relu'))
+    model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding = 'valid'))
+    model.add(BatchNormalization())
+
+    model.add(Conv2D(256, 11, strides = (1, 1), padding='valid', activation = 'relu'))
+
+    model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding='valid'))
+    model.add(BatchNormalization())
+
+    model.add(Conv2D(384, 3, strides = (1, 1), padding='valid', activation = 'relu'))
+    model.add(BatchNormalization())
+
+    model.add(Conv2D(384, 3, strides = (1, 1), padding='valid', activation = 'relu'))
+    model.add(BatchNormalization())
+
+    model.add(Conv2D(256, 3, strides=(1,1), padding='valid', activation = 'relu'))
+
+    model.add(MaxPooling2D(pool_size = (2, 2), strides = (2, 2), padding = 'valid'))
+    model.add(BatchNormalization())
+
+    model.add(Flatten())
+
+    model.add(Dense(units = 4096, activation = 'relu'))
+    model.add(Dropout(0.4))
+    model.add(BatchNormalization())
+    model.add(Dense(units = 4096, activation = 'relu'))
+    model.add(Dropout(0.4))
+    model.add(BatchNormalization())
+    model.add(Dense(units = 1000, activation = 'relu'))
+    model.add(Dropout(0.2))
+    model.add(BatchNormalization())
+    model.add(Dense(units = 38, activation = 'softmax'))
+    return model
+# print(model.summary())
+
+def get_m():
+    return model
+
+# print(model)
+
+model = build()
+model.load_weights("../models/model.hdf5")
+print("INPUT SHAPE : ",model.input_shape)
 
 
-transform = transforms.Compose([
-    transforms.Resize((224,224)),
-    transforms.ToTensor()
-])
+def predict(image_path):
+    img = image.load_img(image_path, target_size=(224, 224))
+    img_array = image.img_to_array(img)
+    img_array = img_array / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-model = to_d(ViT(
-        image_size = 256,
-        patch_size = 32,
-        num_classes = 38,
-        dim = 1024,
-        depth = 6,
-        heads = 16,
-        mlp_dim = 2048,
-        dropout = 0.1,
-        emb_dropout = 0.1
-    ),'cpu') 
+    preds = model.predict(img_array)[0]
+    idx = np.argmax(preds)
+
+    label = lebel_to_idx(class_l)[idx]
+    print(label)
+    predicted_class = label
+    confidence = preds[idx]
+
+    plt.imshow(img)
+    plt.axis("off")
+    plt.title(f"{predicted_class} ({confidence*100:.2f}%)")
+    plt.show()
+
+    return predicted_class, confidence
 
 
-
-img = Image.open(r"C:\Users\RMSTVNMFST\mahesh\disease-vit\data\New Plant Diseases Dataset(Augmented)\New Plant Diseases Dataset(Augmented)\train\Cherry_(including_sour)___healthy\0a0bd696-c093-47ef-866b-7f5a40af3edb___JR_HL 3952.JPG").convert("RGB")
-x = transform(img).unsqueeze(0)
-
-with torch.no_grad():
-    output = model(x)
-
-_, preds  = torch.max(output, dim=1)
-print(preds[0].item())
+predict("../data/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)/train/Corn_(maize)___healthy/026bd735-b9f4-4eab-86f3-23df15dbec95___R.S_HL 7938 copy.jpg")
