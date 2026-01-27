@@ -85,3 +85,4 @@ print("RMSE:", rmse)
 print("R2:", r2)
 
 tcn_model.save("tcn_yield_model.h5")
+
