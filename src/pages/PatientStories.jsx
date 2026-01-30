@@ -3,33 +3,7 @@ import { FaLinkedin, FaGithub, FaEnvelope, FaTractor, FaLeaf, FaSeedling, FaWate
 
 
 function PatientStories() {
-  const teamMembers = [
-    {
-      name: "M. SAI SINDHU",
-      id: "21BQ1A05J9",
-      role: "",
-      nameColor: "text-blue-400 text-3xl"
-    },
-    {
-      name: "S. LIKHIT BABU", 
-      id: "21BQ1A05M3",
-      role: "",
-      nameColor: "text-blue-400 text-3xl"
-    },
-    {
-      name: "S. TEJASWI",
-      id: "21BQ1A05K2",
-      role: "",
-      nameColor: "text-blue-400 text-3xl"
-    },
-    {
-      name: "V. BHARGAVA RAO",
-      id: "21BQ1A05N8",
-      role: "",
-      nameColor: "text-blue-400 text-3xl"
-    }
-  ];
-
+ 
   // India Map SVG Component
   const IndiaMapSVG = () => (
     <motion.svg
@@ -191,52 +165,7 @@ function PatientStories() {
             </div>
           </div>
         </motion.div>
-
-        {/* Team Section (Kept as is) */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-20"
-        >
-          <h2 className="text-4xl font-bold text-center text-white mb-12 glow-text">Our Team</h2>
-          <div className="grid md:grid-cols-2 gap-8">
-            {teamMembers.map((member, index) => (
-              <motion.div
-                key={member.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg p-8 text-center border border-white/20 hover:shadow-xl transition-all duration-300"
-              >
-                <motion.h3
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: index * 0.2 }}
-                  className={`text-2xl font-bold ${member.nameColor} mb-2 glow-text`}
-                >
-                  {member.name}
-                </motion.h3>
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: index * 0.3 }}
-                  className="text-green-400 font-semibold mb-3"
-                >
-                  {member.id}
-                </motion.p>
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: index * 0.4 }}
-                  className="text-gray-300"
-                >
-                  {member.role}
-                </motion.p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+</div>
 
       {/* CSS for glow effects */}
       <style jsx>{`
