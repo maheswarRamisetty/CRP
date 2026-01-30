@@ -15,6 +15,7 @@ tcn_model = tf.keras.models.load_model(TCN_PATH)
 IMG_SIZE = 224
 
 CLASS_NAMES = class_l
+from utils import lebel_to_idx
 
 def preprocess_image(contents):
     npimg = np.frombuffer(contents, np.uint8)
