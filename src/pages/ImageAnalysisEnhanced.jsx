@@ -15,7 +15,7 @@ function ImageAnalysisEnhanced() {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [selectedCrop, setSelectedCrop] = useState('tomato');
 
-  const crops = ['Tomato', 'Potato', 'Maize', 'Rice', 'Wheat', 'Cotton', 'Soybean', 'Pepper'];
+  // const crops = ['Tomato', 'Potato', 'Maize', 'Rice', 'Wheat', 'Cotton', 'Soybean', 'Pepper'];
 
   const onDrop = (acceptedFiles) => {
     const file = acceptedFiles[0];
