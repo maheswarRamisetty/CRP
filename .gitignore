@@ -3,3 +3,4 @@ models/
 *.hdf5
 *.pth
 *.h5
+project/

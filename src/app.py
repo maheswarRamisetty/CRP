@@ -1,64 +1,61 @@
-from fastapi import FastAPI, UploadFile, File, Form
 import numpy as np
 import tensorflow as tf
-import cv2
-import uvicorn
-from utils import class_l
-MODEL_PATH = "../models/model.hdf5"
-TCN_PATH = "../models/tcn_yield_model.h5"
+import joblib
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
+tcn_model = tf.keras.models.load_model("tcn_yield_model.h5")
+scaler_X = joblib.load("scaler_X.pkl")
+scalers_y = joblib.load("scalers_y.pkl")
 
 app = FastAPI()
 
-image_model = tf.keras.models.load_model(MODEL_PATH)
-tcn_model = tf.keras.models.load_model(TCN_PATH)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-IMG_SIZE = 224
+class TCNRequest(BaseModel):
+    rainfall: list[float]
+    pesticides: list[float]
+    avg_temp: list[float]
+    area_code: int
+    item_code: int
 
-CLASS_NAMES = class_l
-from utils import lebel_to_idx
+def build_tcn_input(rainfall, pesticides, avg_temp):
+    X = np.array(list(zip(rainfall, pesticides, avg_temp)), dtype=np.float32)
+    X = scaler_X.transform(X)
+    X = np.expand_dims(X, axis=0)
+    return X
 
-def preprocess_image(contents):
-    npimg = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-    img = img / 255.0
-    img = np.expand_dims(img, axis=0)
-    return img
+@app.post("/predict-yield")
+def predict_yield(req: TCNRequest):
+    if not (len(req.rainfall) == len(req.pesticides) == len(req.avg_temp) == 5):
+        return {"error": "Exactly 5 years of data required"}
 
-@app.post("/predict")
-async def predict(
-    file: UploadFile = File(...),
-    area: float = Form(...),
-    item: float = Form(...),
-    year: float = Form(...),
-    rainfall: float = Form(...),
-    pesticides: float = Form(...),
-    avg_temp: float = Form(...)
-):
-    contents = await file.read()
-    img_array = preprocess_image(contents)
+    X = build_tcn_input(
+        req.rainfall,
+        req.pesticides,
+        req.avg_temp
+    )
 
-    img_pred = image_model.predict(img_array)
-    img_class = int(np.argmax(img_pred))
-    img_conf = float(np.max(img_pred))
+    pred_scaled = tcn_model.predict(X, verbose=0)[0][0]
 
-    image_result = {
-        "class": CLASS_NAMES[img_class],
-        "confidence": round(img_conf, 4)
-    }
+    key = (req.area_code, req.item_code)
+    if key not in scalers_y:
+        return {"error": "Unknown area_code / item_code"}
 
-    tcn_input = np.array([[area, item, year, rainfall, pesticides, avg_temp]], dtype=np.float32)
-    tcn_pred = tcn_model.predict(tcn_input)
-    yield_value = float(tcn_pred[0][0])
-
-    tcn_result = {
-        "predicted_yield": round(yield_value, 2)
-    }
+    scaler_y = scalers_y[key]
+    pred = scaler_y.inverse_transform([[pred_scaled]])[0][0]
 
     return {
-        "image_model": image_result,
-        "tcn_model": tcn_result
+        "predicted_yield_hg_per_ha": round(float(pred), 2)
     }
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
