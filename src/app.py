@@ -5,11 +5,14 @@ import cv2
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from utils import class_l, lebel_to_idx
+from test import build
+import torch.nn as nn
 
 IMAGE_MODEL_PATH = "../models/model.hdf5"
 TCN_MODEL_PATH = "../models/tcn_yield_model.h5"
 
-image_model = tf.keras.models.load_model(IMAGE_MODEL_PATH)
+model = build()
+model.load_weights("../models/model.hdf5")
 tcn_model = tf.keras.models.load_model(TCN_MODEL_PATH)
 scaler_X = joblib.load("scaler_X.pkl")
 scalers_y = joblib.load("scalers_y.pkl")
@@ -41,6 +44,29 @@ def build_tcn_input(rainfall, pesticides, avg_temp):
     X = np.expand_dims(X, axis=0)
     return X
 
+from tensorflow.keras.preprocessing import image
+from io import BytesIO
+
+def predict_image_from_upload(contents):
+    img = image.load_img(BytesIO(contents), target_size=(224, 224))
+    img_array = image.img_to_array(img)
+    img_array = img_array / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+
+    preds = model.predict(img_array)[0]
+    idx = int(np.argmax(preds))
+
+    label = lebel_to_idx(class_l)[idx]
+
+    return {
+        "class": label,
+        "confidence": float(preds[idx])
+    }
+
+print(scaler_X)
+print(scalers_y)
+
+
 @app.post("/predict")
 async def predict(
     file: UploadFile = File(...),
@@ -53,17 +79,17 @@ async def predict(
     item_code: int = Form(...)
 ):
     contents = await file.read()
-    img_array = preprocess_image(contents)
+    # img_array = preprocess_image(contents)
 
-    img_pred = image_model.predict(img_array)
-    img_class = int(np.argmax(img_pred))
-    img_conf = float(np.max(img_pred))
-    idx = lebel_to_idx(CLASS_NAMES)
+    # img_pred = model.predict(img_array)
+    # img_class = int(np.argmax(img_pred))
+    # img_conf = float(np.max(img_pred))
+    # idx = lebel_to_idx(CLASS_NAMES)
 
-    image_result = {
-        "class": idx[img_class],
-        "confidence": round(img_conf, 4)
-    }
+    # image_result = {
+    #     "class": idx[img_class],
+    #     "confidence": round(img_conf, 4)
+    # }
 
     rainfall = list(map(float, rainfall.split(",")))
     pesticides = list(map(float, pesticides.split(",")))
@@ -88,7 +114,7 @@ async def predict(
     }
 
     return {
-        "image_model": image_result,
+        "image_model": predict_image_from_upload(contents),
         "tcn_model": tcn_result
     }
 
