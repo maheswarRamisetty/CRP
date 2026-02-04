@@ -1,30 +1,39 @@
 import numpy as np
 import tensorflow as tf
 import joblib
-from fastapi import FastAPI
-from pydantic import BaseModel
+import cv2
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from utils import class_l, lebel_to_idx
 
-tcn_model = tf.keras.models.load_model("tcn_yield_model.h5")
+IMAGE_MODEL_PATH = "../models/model.hdf5"
+TCN_MODEL_PATH = "../models/tcn_yield_model.h5"
+
+image_model = tf.keras.models.load_model(IMAGE_MODEL_PATH)
+tcn_model = tf.keras.models.load_model(TCN_MODEL_PATH)
 scaler_X = joblib.load("scaler_X.pkl")
 scalers_y = joblib.load("scalers_y.pkl")
+
+IMG_SIZE = 224
+CLASS_NAMES = class_l
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class TCNRequest(BaseModel):
-    rainfall: list[float]
-    pesticides: list[float]
-    avg_temp: list[float]
-    area_code: int
-    item_code: int
+def preprocess_image(contents):
+    npimg = np.frombuffer(contents, np.uint8)
+    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+    img = img / 255.0
+    img = np.expand_dims(img, axis=0)
+    return img
 
 def build_tcn_input(rainfall, pesticides, avg_temp):
     X = np.array(list(zip(rainfall, pesticides, avg_temp)), dtype=np.float32)
@@ -32,28 +41,55 @@ def build_tcn_input(rainfall, pesticides, avg_temp):
     X = np.expand_dims(X, axis=0)
     return X
 
-@app.post("/predict-yield")
-def predict_yield(req: TCNRequest):
-    if not (len(req.rainfall) == len(req.pesticides) == len(req.avg_temp) == 5):
-        return {"error": "Exactly 5 years of data required"}
+@app.post("/predict")
+async def predict(
+    file: UploadFile = File(...),
 
-    X = build_tcn_input(
-        req.rainfall,
-        req.pesticides,
-        req.avg_temp
-    )
+    rainfall: str = Form(...),
+    pesticides: str = Form(...),
+    avg_temp: str = Form(...),
+
+    area_code: int = Form(...),
+    item_code: int = Form(...)
+):
+    contents = await file.read()
+    img_array = preprocess_image(contents)
+
+    img_pred = image_model.predict(img_array)
+    img_class = int(np.argmax(img_pred))
+    img_conf = float(np.max(img_pred))
+    idx = lebel_to_idx(CLASS_NAMES)
+
+    image_result = {
+        "class": idx[img_class],
+        "confidence": round(img_conf, 4)
+    }
+
+    rainfall = list(map(float, rainfall.split(",")))
+    pesticides = list(map(float, pesticides.split(",")))
+    avg_temp = list(map(float, avg_temp.split(",")))
+
+    if not (len(rainfall) == len(pesticides) == len(avg_temp) == 5):
+        return {"error": "Exactly 5 years of data required for TCN"}
+
+    X = build_tcn_input(rainfall, pesticides, avg_temp)
 
     pred_scaled = tcn_model.predict(X, verbose=0)[0][0]
 
-    key = (req.area_code, req.item_code)
+    key = (area_code, item_code)
     if key not in scalers_y:
-        return {"error": "Unknown area_code / item_code"}
+        return {"error": "Invalid area_code or item_code"}
 
     scaler_y = scalers_y[key]
-    pred = scaler_y.inverse_transform([[pred_scaled]])[0][0]
+    yield_pred = scaler_y.inverse_transform([[pred_scaled]])[0][0]
+
+    tcn_result = {
+        "predicted_yield_hg_per_ha": round(float(yield_pred), 2)
+    }
 
     return {
-        "predicted_yield_hg_per_ha": round(float(pred), 2)
+        "image_model": image_result,
+        "tcn_model": tcn_result
     }
 
 if __name__ == "__main__":
