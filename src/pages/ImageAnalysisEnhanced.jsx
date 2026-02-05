@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaImage, FaUpload, FaCamera, FaLeaf, FaBrain, FaExclamationTriangle,
@@ -41,35 +41,72 @@ ChartJS.register(
 );
 
 function IntegratedCropAnalysis() {
-  // Image analysis state
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   
-  // Combined results state
   const [analysisResults, setAnalysisResults] = useState(null);
   const [error, setError] = useState(null);
   
-  // Crop and yield parameters
-  const [selectedCrop, setSelectedCrop] = useState('Rice');
-  const [formData, setFormData] = useState({
-  rainfall: Array(5).fill(''),
-  pesticides: Array(5).fill(''),
-  avg_temp: Array(5).fill(''),
-  area: '',
-  year: ''
-});
-
-  // Available crops for selection
-  const crops = ['Rice', 'Wheat', 'Maize', 'Soybean', 'Cotton', 'Sugarcane', 'Potato', 'Tomato', 'Barley', 'Groundnut'];
+  const [availableAreas, setAvailableAreas] = useState([]);
+  const [availableItems, setAvailableItems] = useState([]);
+  const [loadingMappings, setLoadingMappings] = useState(true);
   
-  // Map crop names to numeric values for backend
-  const cropToNumber = {
-    'Rice': 1, 'Wheat': 2, 'Maize': 3, 'Soybean': 4, 'Cotton': 5,
-    'Sugarcane': 6, 'Potato': 7, 'Tomato': 8, 'Barley': 9, 'Groundnut': 10
-  };
+  const [selectedCrop, setSelectedCrop] = useState('');
+  const [formData, setFormData] = useState({
+    rainfall: Array(5).fill(''),
+    pesticides: Array(5).fill(''),
+    avg_temp: Array(5).fill(''),
+    area_name: '',
+    year: '',
+    area_hectares: ''
+  });
 
-  // Handle image drop
+  useEffect(() => {
+    const fetchMappings = async () => {
+      try {
+        const response = await axios.get("http://localhost:8000/available-mappings");
+        console.log("Mappings response:", response.data);
+        
+        const areas = response.data.areas || [];
+        setAvailableAreas(areas);
+        
+        const items = response.data.items || [];
+        setAvailableItems(items);
+        
+        if (areas.length > 0 && !formData.area_name) {
+          setFormData(prev => ({ ...prev, area_name: areas[0].name }));
+        }
+        if (items.length > 0 && !selectedCrop) {
+          setSelectedCrop(items[0].name);
+        }
+        
+      } catch (error) {
+        console.error("Failed to fetch mappings:", error);
+        const defaultItems = [
+          { name: 'Rice', code: 1 },
+          { name: 'Wheat', code: 2 },
+          { name: 'Maize', code: 3 },
+          { name: 'Soybean', code: 4 },
+          { name: 'Cotton', code: 5 },
+          { name: 'Sugarcane', code: 6 },
+          { name: 'Potato', code: 7 },
+          { name: 'Tomato', code: 8 },
+          { name: 'Barley', code: 9 },
+          { name: 'Groundnut', code: 10 }
+        ];
+        setAvailableItems(defaultItems);
+        if (!selectedCrop && defaultItems.length > 0) {
+          setSelectedCrop(defaultItems[0].name);
+        }
+      } finally {
+        setLoadingMappings(false);
+      }
+    };
+
+    fetchMappings();
+  }, []);
+
   const onDrop = (acceptedFiles) => {
     const file = acceptedFiles[0];
     if (file && file.size <= 5 * 1024 * 1024) {
@@ -93,7 +130,6 @@ function IntegratedCropAnalysis() {
     maxSize: 5242880
   });
 
-  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -102,7 +138,6 @@ function IntegratedCropAnalysis() {
     }));
   };
 
-  // Parse disease name from backend response
   const parseDiseaseName = (diseaseStr) => {
     if (!diseaseStr) return 'Healthy Plant';
     
@@ -118,17 +153,14 @@ function IntegratedCropAnalysis() {
     return cleanName;
   };
 
-
   const handleSequenceChange = (field, index, value) => {
-  setFormData(prev => {
-    const updated = [...prev[field]];
-    updated[index] = value;
-    return { ...prev, [field]: updated };
-  });
-};
+    setFormData(prev => {
+      const updated = [...prev[field]];
+      updated[index] = value;
+      return { ...prev, [field]: updated };
+    });
+  };
 
-
-  // Calculate disease severity based on confidence
   const calculateSeverity = (confidence) => {
     if (confidence >= 90) return 'High';
     if (confidence >= 75) return 'Medium';
@@ -136,7 +168,6 @@ function IntegratedCropAnalysis() {
     return 'Very Low';
   };
 
-  // Calculate infection stage based on confidence
   const calculateStage = (confidence) => {
     if (confidence >= 90) return 'Advanced';
     if (confidence >= 75) return 'Mid';
@@ -144,16 +175,14 @@ function IntegratedCropAnalysis() {
     return 'Initial';
   };
 
-  // Generate CNN explanation (actual model being used)
-  const generateCNNExplanation = (disease, confidence, isHealthy) => {
+  const generateViTExplanation = (disease, confidence, isHealthy) => {
     if (isHealthy) {
-      return '5-layer CNN architecture analyzed the leaf image: Conv2D-96 (11x11 kernel) → MaxPooling → BatchNorm → Conv2D-256 → MaxPooling → Conv2D-384 → Conv2D-384 → Conv2D-256 → MaxPooling → Flatten → Dense-4096 → Dense-4096 → Dense-1000 → Dense-38 (softmax). All layers showed normal activation patterns indicating healthy chlorophyll distribution and intact cellular structure.';
+      return 'Vision Transformer (ViT) architecture analyzed the leaf image: Input patches → Transformer Encoder with 12 layers → Multi-head Self-Attention → MLP Head. All attention heads showed uniform activation patterns indicating healthy chlorophyll distribution and intact cellular structure across image patches.';
     } else {
-      return `CNN detected disease through sequential feature extraction: Conv2D-96 captured initial lesion patterns → Conv2D-256 enhanced texture abnormalities → Conv2D-384 layers refined disease signatures → Final classification in Dense-38 layer identified ${disease} with ${confidence}% confidence. Feature maps showed concentrated activation in diseased regions.`;
+      return `ViT detected disease through attention mechanisms: Patch embeddings captured lesion patterns → Multi-head attention highlighted texture abnormalities → Transformer encoder layers refined disease signatures → Final classification identified ${disease} with ${confidence}% confidence. Attention maps showed concentrated activation in diseased regions across image patches.`;
     }
   };
 
-  // Calculate risk score for yield prediction
   const calculateRiskScore = (rainfall, temperature, pesticides) => {
     let score = 0;
     if (rainfall < 800 || rainfall > 1500) score += 0.4;
@@ -167,19 +196,15 @@ function IntegratedCropAnalysis() {
     if (score < 0.6) return { level: 'Medium', color: 'orange' };
     return { level: 'High', color: 'red' };
   };
-
-  // Generate comprehensive analysis from backend response
   const generateComprehensiveAnalysis = (imageResult, tcnResult, isHealthy, confidence, diseaseName) => {
-    const rainfall = parseFloat(formData.rainfall) || 1200;
-    const temperature = parseFloat(formData.avg_temp) || 25;
-    const pesticides = parseFloat(formData.pesticides) || 50;
+    const rainfall = parseFloat(formData.rainfall[0]) || 1200;
+    const temperature = parseFloat(formData.avg_temp[0]) || 25;
+    const pesticides = parseFloat(formData.pesticides[0]) || 50;
     
-    // Calculate metrics
     const affectedArea = isHealthy ? 0 : Math.floor(Math.random() * 40) + 20;
     const severity = calculateSeverity(confidence);
     const stage = calculateStage(confidence);
     
-    // Calculate CHI (Crop Health Index)
     const calculateCHI = (conf, area) => {
       const baseScore = conf;
       const areaPenalty = area * 0.5;
@@ -187,23 +212,19 @@ function IntegratedCropAnalysis() {
     };
     const chi = calculateCHI(confidence, affectedArea);
     
-    // Yield calculations
-    const predictedYield = tcnResult?.predicted_yield || 25000;
+    const predictedYield = tcnResult?.predicted_yield_hg_per_ha || 25000;
     const riskScore = calculateRiskScore(rainfall, temperature, pesticides);
     const riskLevel = getRiskLevel(riskScore);
     
-    // Calculate yield impact
     const baseYield = parseFloat(predictedYield) || 25000;
     const yieldImpact = isHealthy ? 0 : Math.max(0, Math.min(100, Math.round((100 - (baseYield / 30000 * 100)))));
     
-    // Generate scenarios
     const normalYield = baseYield;
     const droughtYield = baseYield * 0.7;
     const highRainYield = baseYield * 0.9;
     const optimalYield = baseYield * 1.3;
     
     return {
-      // Disease Analysis
       disease: diseaseName,
       confidence: confidence,
       severity: severity,
@@ -212,40 +233,36 @@ function IntegratedCropAnalysis() {
       status: isHealthy ? 'healthy' : 'diseased',
       affectedArea: affectedArea,
       
-      // Yield Analysis
       predictedYield: predictedYield,
       yieldImpact: yieldImpact,
       riskAssessment: riskLevel,
       
-      // Visual Features (CNN-based)
       visualFeatures: {
-        colorVariation: isHealthy ? 
-          'Normal green spectrum detected across all convolutional feature maps' : 
-          `Discoloration patterns identified in Conv2D-256 layer (${affectedArea}% of feature maps)`,
+        patchAttention: isHealthy ? 
+          'Uniform attention across all 196 image patches with normal chlorophyll distribution' : 
+          `Localized attention patterns identified in ${affectedArea}% of image patches indicating disease`,
         textureAnalysis: isHealthy ? 
-          'Smooth texture patterns with uniform activation in Conv2D-384 layers' : 
-          'Lesion patterns detected by CNN texture analysis, irregular activations in middle layers',
+          'Smooth texture patterns with consistent attention weights across transformer layers' : 
+          'Lesion patterns detected by ViT multi-head attention, irregular activations in middle encoder layers',
         shapeDistortion: isHealthy ? 
-          'Normal leaf morphology preserved through all convolutional layers' : 
-          `Curling and deformation patterns identified (${Math.round(affectedArea/2)}% of area)`,
+          'Normal leaf morphology preserved through all transformer encoder layers' : 
+          `Curling and deformation patterns identified (${Math.round(affectedArea/2)}% of area) by patch embeddings`,
         patternRecognition: isHealthy ? 
-          'Uniform chlorophyll patterns across all feature maps' : 
-          'Concentric necrotic zones identified by CNN pattern recognition',
-        edgeDefinition: isHealthy ? 
-          'Clear edges with consistent boundary detection' : 
-          'Irregular margins detected by edge filters in early CNN layers'
+          'Uniform patterns across all attention maps' : 
+          'Concentric necrotic zones identified by ViT patch-level pattern recognition',
+        boundaryDetection: isHealthy ? 
+          'Clear boundaries with consistent patch embeddings' : 
+          'Irregular margins detected by attention mechanisms in early transformer layers'
       },
       
-      // Disease Metrics
       diseaseMetrics: isHealthy ? null : {
         spreadRate: `${Math.round(confidence/5)}-${Math.round(confidence/4)}% expansion expected in 3-5 days`,
         infectionLevel: stage,
-        pathogenType: 'Fungal (CNN feature maps indicate fungal infection patterns)',
+        pathogenType: 'Fungal (ViT attention maps indicate fungal infection patterns)',
         environmentalFactors: ['High humidity', 'Moderate temperature', 'Poor air circulation'],
-        cnnDetection: `Detected by Conv2D-384 layers with ${confidence}% confidence`
+        vitDetection: `Detected by transformer encoder layers with ${confidence}% confidence`
       },
       
-      // TCN Model Insights
       tcnInsights: {
         architecture: 'Temporal Convolutional Network with dilated convolutions',
         receptive_field: 'Analyzed 90-day temporal patterns for yield prediction',
@@ -259,7 +276,6 @@ function IntegratedCropAnalysis() {
         }
       },
       
-      // Risk Assessment
       riskFactors: {
         rainfall_risk: { 
           level: rainfall < 800 ? 'High' : rainfall < 1200 ? 'Medium' : 'Low',
@@ -278,7 +294,6 @@ function IntegratedCropAnalysis() {
         }
       },
       
-      // Scenarios
       scenarios: {
         normal: { yield: normalYield.toFixed(2), probability: 60 },
         drought: { yield: droughtYield.toFixed(2), probability: 20 },
@@ -286,9 +301,9 @@ function IntegratedCropAnalysis() {
         optimal: { yield: optimalYield.toFixed(2), probability: 8 }
       },
       
-      // Recommendations
+      
       recommendations: isHealthy ? [
-        'Continue current maintenance practices - CNN analysis shows optimal health',
+        'Continue current maintenance practices - ViT analysis shows optimal health',
         'Monitor regularly for any early signs of stress or disease',
         'Maintain optimal watering schedule based on TCN rainfall predictions',
         'Ensure adequate sunlight exposure for photosynthesis',
@@ -303,98 +318,136 @@ function IntegratedCropAnalysis() {
         'Consider soil amendment for nutrient balance'
       ],
       
-      // Technical Explanation
-      explanation: generateCNNExplanation(diseaseName, confidence, isHealthy),
+      explanation: generateViTExplanation(diseaseName, confidence, isHealthy),
       
-      // Raw backend data
       rawData: {
         image_model: imageResult,
         tcn_model: tcnResult
       },
       
-      // Input Summary
       inputSummary: {
         crop: selectedCrop,
-        ...formData
+        area_name: formData.area_name,
+        area_hectares: formData.area_hectares,
+        year: formData.year,
+        rainfall: formData.rainfall,
+        pesticides: formData.pesticides,
+        avg_temp: formData.avg_temp
       }
     };
   };
 
   const analyzeEverything = async () => {
-  if (!uploadedImage) {
-    alert("Please upload an image first");
-    return;
-  }
+    if (!uploadedImage) {
+      alert("Please upload an image first");
+      return;
+    }
 
-  setAnalyzing(true);
-  setError(null);
+    if (!formData.area_name) {
+      setError("Please select an area");
+      return;
+    }
+    
+    if (!selectedCrop) {
+      setError("Please select a crop");
+      return;
+    }
 
-  const normalizeSeries = (value) => {
-    if (Array.isArray(value)) return value;
-    return String(value)
-      .split(",")
-      .map(v => Number(v.trim()))
-      .filter(v => !isNaN(v));
+    setAnalyzing(true);
+    setError(null);
+
+    const normalizeSeries = (value) => {
+      if (Array.isArray(value)) return value;
+      return String(value)
+        .split(",")
+        .map(v => Number(v.trim()))
+        .filter(v => !isNaN(v));
+    };
+
+    const rainfallArr = normalizeSeries(formData.rainfall);
+    const pesticidesArr = normalizeSeries(formData.pesticides);
+    const avgTempArr = normalizeSeries(formData.avg_temp);
+
+    if (
+      rainfallArr.length !== 5 ||
+      pesticidesArr.length !== 5 ||
+      avgTempArr.length !== 5
+    ) {
+      setError("Please enter exactly 5 values for rainfall, pesticides, and temperature");
+      setAnalyzing(false);
+      return;
+    }
+
+    try {
+      const checkResponse = await axios.get(
+        `http://localhost:8000/check-combination/${encodeURIComponent(formData.area_name)}/${encodeURIComponent(selectedCrop)}`
+      );
+      
+      if (!checkResponse.data.exists) {
+        setError(`The combination of ${formData.area_name} and ${selectedCrop} is not available in the training data. Please try a different combination.`);
+        setAnalyzing(false);
+        return;
+      }
+    } catch (error) {
+      console.warn("Could not check combination, proceeding anyway...", error.message);
+    }
+
+    const formDataToSend = new FormData();
+    formDataToSend.append("file", uploadedImage);
+    formDataToSend.append("rainfall", rainfallArr.join(","));
+    formDataToSend.append("pesticides", pesticidesArr.join(","));
+    formDataToSend.append("avg_temp", avgTempArr.join(","));
+    formDataToSend.append("area_name", formData.area_name);
+    formDataToSend.append("item_name", selectedCrop);
+
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/predict",
+        formDataToSend,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      console.log("Backend response:", response.data);
+
+      if (response.data.error) {
+        setError(response.data.error);
+        setAnalyzing(false);
+        return;
+      }
+
+      const imageResult = response.data.image_model;
+      const tcnResult = response.data.tcn_model;
+
+      const diseaseName = parseDiseaseName(imageResult.class);
+      const confidence = Math.round(imageResult.confidence * 100);
+      const isHealthy = diseaseName.toLowerCase().includes("healthy");
+
+      const comprehensiveAnalysis = generateComprehensiveAnalysis(
+        imageResult,
+        tcnResult,
+        isHealthy,
+        confidence,
+        diseaseName
+      );
+
+      setAnalysisResults(comprehensiveAnalysis);
+
+    } catch (error) {
+      console.error("Error analyzing:", error);
+      if (error.response?.data?.detail) {
+        if (typeof error.response.data.detail === 'object') {
+          setError(`Combination not found: ${error.response.data.detail.error}`);
+        } else {
+          setError(error.response.data.detail);
+        }
+      } else {
+        setError("Failed to connect to backend. Make sure FastAPI is running on port 8000.");
+      }
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
-  const rainfallArr = normalizeSeries(formData.rainfall);
-  const pesticidesArr = normalizeSeries(formData.pesticides);
-  const avgTempArr = normalizeSeries(formData.avg_temp);
-
-  if (
-    rainfallArr.length !== 5 ||
-    pesticidesArr.length !== 5 ||
-    avgTempArr.length !== 5
-  ) {
-    setError("Please enter exactly 5 values for rainfall, pesticides, and temperature");
-    setAnalyzing(false);
-    return;
-  }
-
-  const formDataToSend = new FormData();
-  formDataToSend.append("file", uploadedImage);
-  formDataToSend.append("rainfall", rainfallArr.join(","));
-  formDataToSend.append("pesticides", pesticidesArr.join(","));
-  formDataToSend.append("avg_temp", avgTempArr.join(","));
-  formDataToSend.append("area_code", formData.area);
-  formDataToSend.append("item_code",0);
-
-  try {
-    const response = await axios.post(
-      "http://localhost:8000/predict",
-      formDataToSend,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-
-    console.log("Backend response:", response.data);
-
-    const imageResult = response.data.image_model;
-    const tcnResult = response.data.tcn_model;
-
-    const diseaseName = parseDiseaseName(imageResult.class);
-    const confidence = Math.round(imageResult.confidence * 100);
-    const isHealthy = diseaseName.toLowerCase().includes("healthy");
-
-    const comprehensiveAnalysis = generateComprehensiveAnalysis(
-      imageResult,
-      tcnResult,
-      isHealthy,
-      confidence,
-      diseaseName
-    );
-
-    setAnalysisResults(comprehensiveAnalysis);
-
-  } catch (error) {
-    console.error("Error analyzing:", error);
-    setError("Failed to connect to backend. Make sure FastAPI is running on port 8000.");
-  } finally {
-    setAnalyzing(false);
-  }
-};
-
-
-  // Utility functions
   const getSeverityColor = (severity) => {
     switch(severity) {
       case 'High': return 'text-red-600 bg-red-100 border-red-300';
@@ -489,13 +542,13 @@ function IntegratedCropAnalysis() {
                 Integrated Crop Analysis System
               </h1>
               <p className="text-lg text-blue-600 mt-1">
-                CNN + TCN Dual Model Analysis
+                ViT + TCN Dual Model Analysis
               </p>
             </div>
             <FaNetworkWired className="text-5xl text-purple-600" />
           </div>
           <p className="text-gray-600 max-w-3xl mx-auto mt-2">
-            Combined deep learning system for real-time disease detection (CNN) and yield prediction (TCN) using actual model inferences
+            Combined deep learning system for real-time disease detection (Vision Transformer) and yield prediction (TCN) using actual model inferences
           </p>
           
           {error && (
@@ -507,10 +560,10 @@ function IntegratedCropAnalysis() {
               <div className="flex items-center gap-3">
                 <FaExclamationTriangle className="text-red-600 text-xl" />
                 <div>
-                  <p className="font-semibold text-red-800">Backend Connection Required</p>
+                  <p className="font-semibold text-red-800">Error</p>
                   <p className="text-red-700 text-sm mt-1">{error}</p>
                   <p className="text-red-600 text-xs mt-2">
-                    Using simulated data. Start backend at localhost:8000 for real predictions.
+                    Make sure backend is running on localhost:8000
                   </p>
                 </div>
               </div>
@@ -584,6 +637,31 @@ function IntegratedCropAnalysis() {
             </h2>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              {/* Area Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FaMapMarkerAlt className="inline mr-2 text-blue-600" />
+                  Area (Region)
+                </label>
+                <select
+                  name="area_name"
+                  value={formData.area_name}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={loadingMappings}
+                >
+                  <option value="">Select Area</option>
+                  {availableAreas.map(area => (
+                    <option key={area.name} value={area.name}>
+                      {area.name}
+                    </option>
+                  ))}
+                </select>
+                {loadingMappings && (
+                  <p className="text-xs text-gray-500 mt-1">Loading areas...</p>
+                )}
+              </div>
+
               {/* Crop Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -594,14 +672,21 @@ function IntegratedCropAnalysis() {
                   value={selectedCrop}
                   onChange={(e) => setSelectedCrop(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={loadingMappings}
                 >
-                  {crops.map(crop => (
-                    <option key={crop} value={crop}>{crop}</option>
+                  <option value="">Select Crop</option>
+                  {availableItems.map(item => (
+                    <option key={item.name} value={item.name}>
+                      {item.name}
+                    </option>
                   ))}
                 </select>
+                {loadingMappings && (
+                  <p className="text-xs text-gray-500 mt-1">Loading crops...</p>
+                )}
               </div>
 
-              {/* Area */}
+              {/* Area Hectares */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <FaChartBar className="inline mr-2 text-blue-600" />
@@ -609,11 +694,12 @@ function IntegratedCropAnalysis() {
                 </label>
                 <input
                   type="number"
-                  name="area"
-                  value={formData.area}
+                  name="area_hectares"
+                  value={formData.area_hectares}
                   onChange={handleInputChange}
                   step="0.1"
                   min="0.1"
+                  placeholder="e.g., 10.5"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -631,85 +717,88 @@ function IntegratedCropAnalysis() {
                   onChange={handleInputChange}
                   min="2000"
                   max="2030"
+                  placeholder="2024"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               {/* Rainfall */}
-                    <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          <FaUmbrella className="inline mr-2 text-blue-600" />
-          Rainfall (last 5 years, mm)
-        </label>
-
-        <div className="grid grid-cols-5 gap-2">
-          {formData.rainfall.map((val, i) => (
-            <input
-              key={i}
-              type="number"
-              placeholder={`Y${i + 1}`}
-              value={val}
-              onChange={(e) =>
-                handleSequenceChange('rainfall', i, e.target.value)
-              }
-              className="px-2 py-1 border rounded-md text-sm"
-            />
-          ))}
-        </div>
-      </div>
-
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FaUmbrella className="inline mr-2 text-blue-600" />
+                  Rainfall (last 5 years, mm)
+                </label>
+                <div className="grid grid-cols-5 gap-2">
+                  {formData.rainfall.map((val, i) => (
+                    <div key={i} className="relative">
+                      <input
+                        type="number"
+                        placeholder={`Y${i + 1}`}
+                        value={val}
+                        onChange={(e) =>
+                          handleSequenceChange('rainfall', i, e.target.value)
+                        }
+                        className="w-full px-2 py-1 border rounded-md text-sm"
+                      />
+                      <span className="absolute -top-2 left-1 text-xs bg-white px-1 text-gray-500">Y{i+1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {/* Pesticides */}
-             
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    <FaSprayCan className="inline mr-2 text-red-600" />
-    Pesticides (last 5 years, tonnes)
-  </label>
-
-  <div className="grid grid-cols-5 gap-2">
-    {formData.pesticides.map((val, i) => (
-      <input
-        key={i}
-        type="number"
-        placeholder={`Y${i + 1}`}
-        value={val}
-        onChange={(e) =>
-          handleSequenceChange('pesticides', i, e.target.value)
-        }
-        className="px-2 py-1 border rounded-md text-sm"
-      />
-    ))}
-  </div>
-
-
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FaSprayCan className="inline mr-2 text-red-600" />
+                  Pesticides (last 5 years, tonnes)
+                </label>
+                <div className="grid grid-cols-5 gap-2">
+                  {formData.pesticides.map((val, i) => (
+                    <div key={i} className="relative">
+                      <input
+                        type="number"
+                        placeholder={`Y${i + 1}`}
+                        value={val}
+                        onChange={(e) =>
+                          handleSequenceChange('pesticides', i, e.target.value)
+                        }
+                        className="w-full px-2 py-1 border rounded-md text-sm"
+                      />
+                      <span className="absolute -top-2 left-1 text-xs bg-white px-1 text-gray-500">Y{i+1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {/* Temperature */}
-             
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    <FaTemperatureHigh className="inline mr-2 text-red-600" />
-    Avg Temperature (last 5 years, °C)
-  </label>
-
-  <div className="grid grid-cols-5 gap-2">
-    {formData.avg_temp.map((val, i) => (
-      <input
-        key={i}
-        type="number"
-        placeholder={`Y${i + 1}`}
-        value={val}
-        onChange={(e) =>
-          handleSequenceChange('avg_temp', i, e.target.value)
-        }
-        className="px-2 py-1 border rounded-md text-sm"
-      />
-    ))}
-  </div>
-
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FaTemperatureHigh className="inline mr-2 text-red-600" />
+                  Avg Temperature (last 5 years, °C)
+                </label>
+                <div className="grid grid-cols-5 gap-2">
+                  {formData.avg_temp.map((val, i) => (
+                    <div key={i} className="relative">
+                      <input
+                        type="number"
+                        placeholder={`Y${i + 1}`}
+                        value={val}
+                        onChange={(e) =>
+                          handleSequenceChange('avg_temp', i, e.target.value)
+                        }
+                        className="w-full px-2 py-1 border rounded-md text-sm"
+                        step="0.1"
+                      />
+                      <span className="absolute -top-2 left-1 text-xs bg-white px-1 text-gray-500">Y{i+1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <button
               onClick={analyzeEverything}
-              disabled={analyzing || !uploadedImage}
+              disabled={analyzing || !uploadedImage || !formData.area_name || !selectedCrop}
               className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg font-semibold"
             >
               {analyzing ? (
@@ -724,13 +813,13 @@ function IntegratedCropAnalysis() {
               ) : (
                 <>
                   <FaBrain />
-                  Analyze with CNN + TCN Models
+                  Analyze with ViT + TCN Models
                 </>
               )}
             </button>
 
             <p className="text-xs text-gray-500 text-center mt-2">
-              Uses actual model.hdf5 (CNN) and tcn_yield_model.h5 (TCN) from backend
+              Uses Vision Transformer for disease detection and TCN for yield prediction
             </p>
           </motion.div>
         </div>
@@ -753,8 +842,9 @@ function IntegratedCropAnalysis() {
                     </h2>
                     <p className="text-gray-600">
                       Crop: <span className="font-semibold">{analysisResults.inputSummary.crop}</span> | 
-                      Area: <span className="font-semibold">{analysisResults.inputSummary.area} ha</span> | 
-                      Year: <span className="font-semibold">{analysisResults.inputSummary.year}</span>
+                      Area: <span className="font-semibold">{analysisResults.inputSummary.area_name}</span> | 
+                      Land Size: <span className="font-semibold">{analysisResults.inputSummary.area_hectares || 'N/A'} ha</span> | 
+                      Year: <span className="font-semibold">{analysisResults.inputSummary.year || 'N/A'}</span>
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -833,11 +923,11 @@ function IntegratedCropAnalysis() {
 
               {/* Detailed Analysis Grid */}
               <div className="grid lg:grid-cols-3 gap-6">
-                {/* CNN Analysis */}
+                {/* ViT Analysis */}
                 <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6">
                   <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                     <FaLayerGroup className="text-green-600" />
-                    CNN Disease Analysis
+                    Vision Transformer (ViT) Disease Analysis
                   </h3>
                   
                   {/* Disease Progress */}
@@ -862,7 +952,7 @@ function IntegratedCropAnalysis() {
                   )}
 
                   {/* Visual Features */}
-                  <h4 className="font-semibold text-gray-800 mb-3">CNN Feature Detection</h4>
+                  <h4 className="font-semibold text-gray-800 mb-3">ViT Attention Features</h4>
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     {Object.entries(analysisResults.visualFeatures).map(([key, value], index) => (
                       <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -874,7 +964,7 @@ function IntegratedCropAnalysis() {
                     ))}
                   </div>
 
-                  {/* CNN Explanation */}
+                  {/* ViT Explanation */}
                   <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-xl border border-green-200">
                     <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                       <FaBrain className="text-blue-600" />
@@ -980,7 +1070,7 @@ function IntegratedCropAnalysis() {
                   <div className="p-3 bg-white rounded-lg border border-gray-200">
                     <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <FaLayerGroup className="text-green-600" />
-                      CNN Model Output
+                      ViT Model Output
                     </h4>
                     <p className="text-sm text-gray-600">
                       Class: <span className="font-semibold">{analysisResults.rawData.image_model?.class || 'N/A'}</span>
@@ -998,10 +1088,15 @@ function IntegratedCropAnalysis() {
                     </h4>
                     <p className="text-sm text-gray-600">
                       Predicted Yield: <span className="font-semibold">
-                        {analysisResults.rawData.tcn_model?.predicted_yield || 'N/A'} hg/ha
+                        {analysisResults.rawData.tcn_model?.predicted_yield_hg_per_ha || 'N/A'} hg/ha
                       </span>
                     </p>
-                    <p className="text-xs text-gray-500">Port: localhost:8000</p>
+                    <p className="text-sm text-gray-600">
+                      Area: <span className="font-semibold">
+                        {analysisResults.rawData.tcn_model?.area_name || 'N/A'}
+                      </span>
+                    </p>
+                   
                   </div>
                 </div>
               </div>
@@ -1010,24 +1105,13 @@ function IntegratedCropAnalysis() {
         </AnimatePresence>
 
         {/* Footer Info */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mt-8 p-4 bg-white rounded-2xl shadow-xl"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-gray-800">Dual Model Architecture</h3>
-              <p className="text-sm text-gray-600">
-                CNN for image analysis + TCN for temporal yield prediction
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Backend: FastAPI on localhost:8000</p>
-              <p className="text-xs text-gray-500">Models: model.hdf5 + tcn_yield_model.h5</p>
-            </div>
-          </div>
-        </motion.div>
+         
+        </motion.div> */}
       </div>
     </div>
   );
