@@ -41,11 +41,11 @@ function AppRoutes() {
           <PatientStories />
         </ProtectedRoute>
       } /> */}
-      <Route path="/learning" element={
+      {/* <Route path="/learning" element={
         <ProtectedRoute>
           <Learning />
         </ProtectedRoute>
-      } />
+      } /> */}
     </Routes>
   );
 }

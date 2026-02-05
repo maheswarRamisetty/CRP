@@ -10,11 +10,11 @@ function Navbar() {
   const navItems = [
     { path: '/', label: 'Home' },
     { path: '/image-page', label: 'Image Analysis', protected: true },
-    { path: '/prediction-page', label: 'Predictions', protected: true },
-    { path: '/learning', label: 'Water Tools', protected: true },
-    { path: '/analysis', label: 'Schemes', protected: true },
+    // { path: '/prediction-page', label: 'Predictions', protected: true },
+    // { path: '/learning', label: 'Water Tools', protected: true },
+    // { path: '/analysis', label: 'Schemes', protected: true },
     { path: '/food-recommendations', label: 'Techniques', protected: true },
-    { path: '/stories', label: 'Survey', protected: true }
+    // { path: '/stories', label: 'Survey', protected: true }
   ];
 
   const handleNavClick = (path, isProtected) => {
