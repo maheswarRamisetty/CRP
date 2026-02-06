@@ -7,7 +7,6 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from utils import class_l, lebel_to_idx
 from test import build
-import torch.nn as nn
 from tensorflow.keras.preprocessing import image
 from io import BytesIO
 from sklearn.preprocessing import StandardScaler
@@ -102,7 +101,7 @@ async def check_combination(area_name: str, item_name: str):
         "area_code": area_code,
         "item_code": item_code,
         "key": key,
-        "message": f"Combination {'exists' if exists else 'does not exist'}"
+        "message": f"Combination {'OK' if exists else 'NOT OK'}"
     }
 
 @app.post("/predict")
