@@ -1,0 +1,73 @@
+1. Deep Learning for Crop Yield Prediction
+
+Deep learning is really good at figuring out how food we can grow. This is especially true when a lot of things like weather and soil type affect how well crops do. Older computer models have a time understanding how all these things are connected.
+
+Deep learning models are different. They are very good at looking at pictures and information over time to predict crop yields. This is because they can break down information into parts and look at how they fit together.
+
+For example deep learning can look at what the weather has been like and how that affects the soil. Then it can use that information to predict how well crops will grow. This makes deep learning very good at predicting crop yields. Deep learning is good, at this because it can look at a lot of information and make sense of it.
+
+Crop yield prediction models are really good at guessing how food we can get from crops. The models that use learning like Convolutional Neural Networks and Recurrent Neural Networks are actually better than the old ways of doing things. They are good at looking at pictures from satellites and information about the environment to figure out what is going on. This helps them make good guesses about crop yields. Crop yield prediction models that use learning are just better because they can understand complicated things, from the data they get like satellite pictures and environmental records.
+
+Recent work has shown that using pictures from satellites taken at times along with computer systems that learn and make predictions can help us guess how well crops like wheat, corn and soybeans will do on individual farms. It is pretty clear that computer models that use lots of types of data including what the plants look like and how healthy they're work better than simpler models. This just shows how important it is to combine types of information when we are trying to understand what is going on with crops, like wheat, corn and soybeans.
+
+We have found some gaps that need to be addressed. These are the gaps identified in the process. The gaps identified will be reviewed. The main gaps identified are related to the system. The gaps identified will help us improve the system.
+
+* The gaps identified will be used to make changes
+
+* The gaps identified are very important, to the project
+
+The gaps identified're a key part of the project. We will use the gaps identified to move.
+
+Most studies use CNN and RNN architectures a lot.. Now people think we need models that can handle time sequences better. We need models that can see how things are connected over a period of time. This is important, for time sequences. Time sequences are a deal and we need to make sure our models can understand them. We are talking about time sequences and how to make models that work well with them.
+
+It is really hard to understand how some systems work. That is a big problem when we want to use them to help make decisions. The fact that we do not really get how these systems come up with their answers is what holds us back from using them in the world like, in decision support systems where we need to be sure of what is going on.
+
+2. Temporal Modeling of Weather, Soil & Historical Data
+
+Weather patterns that happen over time how wet the soil. How crops did in the past are really important to figure out what will happen with farming. People usually use something called RNNs and LSTM models to look at what happened in the past and try to guess what will happen next. But these models have some problems. They can have trouble learning from things that happened a time ago and they can get confused when things get really complicated. Temporal patterns in weather soil moisture and historical crop performance are still very important to think about when we're trying to forecast agricultural outcomes, like crop yields.
+
+Temporal Convolutional Networks or TCNs for short are getting a lot of attention these days for modeling time series data. This is because TCNs can handle long sequences of data without running into problems. They do this by using something called convolutional operations which helps them stay stable.
+
+Some people are also looking into using TCNs with types of models like convolutional models to make hybrid models. These hybrid models seem to work than traditional models especially when you have a lot of historical data that you need to look at to make predictions about things like yields. Temporal Convolutional Networks are really good, at this.
+
+These systems are really good at figuring out patterns that happen over time from weather and soil information. This helps them deal with changes in the weather and give predictions of how much food we can grow. This is a deal for people who want to make sure we can grow food in a way that is good for the earth. The systems are good, at helping with the problems that come up when we try to grow food in a way that is sustainable. Weather and soil data are very important for these systems to work well and help with agriculture.
+
+3. Vision Transformers (ViTs) for Image-Based Crop Health Assessment
+
+People have been using something called CNNs to look at pictures of farms and crops.. Now Vision Transformers or ViTs for short are being used more and more. This is because Vision Transformers have a way of looking at pictures that lets them see things that are far apart in the image. Vision Transformers can do this without having any notions about what they are looking at which is a problem with the old way of doing things with CNNs. Vision Transformers are really good at looking at images and understanding what is going on in them which is why they are being used for agricultural image analysis, with Vision Transformers.
+
+Recent advances using Vision Transformers or ViTs for short have been made in farming tasks. For example people are using ViTs to detect diseases in leaves. They take high-resolution pictures of the leaves and the ViTs are really good at figuring out what is wrong with them. This is especially true when the pictures are taken outside in fields where it can be hard to get photos. The ViTs are better at this than computer models like the standard CNN models. The ViTs can even tell what is wrong with the leaves when the light is not very good or when there is a lot of stuff in the picture that can make it hard to see what is going on. Vision Transformers are really good, at finding the signs of disease in leaves.
+
+People have also come up with ways to predict crop yields. These new methods use temporal transformers together. This means they look at the images of the crops and also think about what happens to the crops over time. The spatial images show what the crops look like in an area. The temporal part looks at how the crops change with the seasons and the weather. This helps us understand how the crops grow and what affects that growth. Crop yield prediction is what this is about. Spatial and temporal transformers work together to make these predictions better. They take into account the image features and the seasonal and climatic influences on crop growth dynamics. This is important, for crop yield prediction.
+
+4. Computer Vision & Remote Sensing in Precision Agriculture
+
+Remote sensing technologies like the pictures taken by satellites and drones are really important for keeping an eye on how healthy cropsre how much water is in the soil and how well plants are growing. The pictures from satellites and drones give us a lot of information about the land and the light it reflects which is useful for computers that can learn and understand this information like learning models. Remote sensing technologies are used to collect this information. It is very useful for things like crop health and soil moisture and remote sensing technologies help us understand vegetation indices, such, as NDVI.
+
+Computer vision is really useful. It helps with things like figuring out what crops are finding diseases guessing how food we will get and spotting weeds. Computer vision review studies show that deep learning frameworks like CNNs and ViTs and hybrid models make these tasks a lot better. When we use computer vision with tools like IoT and UAV platforms it gets even better. We can get data and make decisions faster. This is very helpful, for people who work with crops and food. Computer vision and these other tools can work together to make things easier.
+
+Challenges in Vision Applications:
+
+Data scarcity and class imbalance in agricultural images
+
+High computational requirements for real-time inference
+
+Difficulty in model transferability across different crops and environments
+
+
+
+
+Links : 
+1)https://www.sciencedirect.com/science/article/pii/S2772375525007932
+2)https://www.mdpi.com/2673-4591/118/1/34
+3)https://arxiv.org/abs/2210.01272
+4)https://en.wikipedia.org/wiki/Vision_transformer
+5)https://www.nature.com/articles/s41598-025-10537-6
+6)https://doi.org/10.54254/2753-8818/2025.CH22224
+7)https://www.mdpi.com/1424-8220/25/2/472
+
+Data Card Links:
+1)https://arxiv.org/abs/2312.00069
+2)https://arxiv.org/abs/2308.12061
+3)https://farmonaut.com/asia/agriculture-training-datasets-crop-yield-dataset-india
+4)https://link.springer.com/article/10.1007/s44187-025-00338-1
